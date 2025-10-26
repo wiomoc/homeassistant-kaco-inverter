@@ -15,15 +15,15 @@ _INVERTER_MODELS_BY_TYPE = {
     "6650su": "Powador 6650 supreme",
     "7200su": "Powador 7200 supreme",
     "8000su": "Powador 8000 supreme",
-    "020L11": "blueplanet 2.0 TL1",
-    "026L11": "blueplanet 2.6 TL1",
-    "030L11": "blueplanet 3.0 TL1", # 3.3.2
-    "030L12": "blueplanet 3.0 TL1-M2", # 3.3.2
-    "035L12": "blueplanet 3.5 TL1", # 3.3.2
-    "037L12": "blueplanet 3.7 TL1", # 3.3.2
-    "040L12": "blueplanet 4.0 TL1", # 3.3.2
-    "046L12": "blueplanet 4.6 TL1", # 3.3.2
-    "050L12": "blueplanet 5.0 TL1", # 3.3.2
+    "20L11": "blueplanet 2.0 TL1",
+    "26L11": "blueplanet 2.6 TL1",
+    "30L11": "blueplanet 3.0 TL1", # 3.3.2
+    "30L12": "blueplanet 3.0 TL1-M2", # 3.3.2
+    "35L12": "blueplanet 3.5 TL1", # 3.3.2
+    "37L12": "blueplanet 3.7 TL1", # 3.3.2
+    "40L12": "blueplanet 4.0 TL1", # 3.3.2
+    "46L12": "blueplanet 4.6 TL1", # 3.3.2
+    "50L12": "blueplanet 5.0 TL1", # 3.3.2
     "3200I": "Powador 3200 International version",
     "4200I": "Powador 4400 International version",
     "4400I": "Powador 4400 International version",
@@ -67,19 +67,19 @@ _INVERTER_MODELS_BY_TYPE = {
     "11k2": "Powador 33000xi/2 Inverter unit 2",
     "11k3": "Powador 33000xi/3 inverter unit 3",
     "3x11k": "Powador 33000xi",
-    "030L32": "blueplanet 3.0 TL3", # 3.3.2
-    "040L32": "blueplanet 4.0 TL3", # 3.3.2
-    "050L32": "blueplanet 5.0 TL3", # 3.3.2
-    "065L32": "blueplanet 6.5 TL3", # 3.3.2
-    "075L32": "blueplanet 7.5 TL3", # 3.3.2
-    "086L32": "blueplanet 8.6 TL3", # 3.3.2
-    "090L32": "blueplanet 9.0 TL3", # 3.3.2
+    "30L32": "blueplanet 3.0 TL3", # 3.3.2
+    "40L32": "blueplanet 4.0 TL3", # 3.3.2
+    "50L32": "blueplanet 5.0 TL3", # 3.3.2
+    "65L32": "blueplanet 6.5 TL3", # 3.3.2
+    "75L32": "blueplanet 7.5 TL3", # 3.3.2
+    "86L32": "blueplanet 8.6 TL3", # 3.3.2
+    "90L32": "blueplanet 9.0 TL3", # 3.3.2
     "100L32": "blueplanet 10.0 TL3", # 3.3.2
     "150L32": "blueplanet 15.0 TL3", # 3.3.2
     "200L32": "blueplanet 20.0 TL3", # 3.3.2
-    "03X24": "blueplanet 3.0NX3 M2", # 3.3.2
-    "05X24": "blueplanet 5.0NX3 M2", # 3.3.2
-    "08X24": "blueplanet 8.0NX3 M2", # 3.3.2
+    "3X24": "blueplanet 3.0NX3 M2", # 3.3.2
+    "5X24": "blueplanet 5.0NX3 M2", # 3.3.2
+    "8X24": "blueplanet 8.0NX3 M2", # 3.3.2
     "10X24": "blueplanet 10.0NX3 M2", # 3.3.2
     "12X24": "blueplanet 12.0NX3 M2", # 3.3.2
     "15X24": "blueplanet 15.0NX3 M2", # 3.3.2
@@ -111,7 +111,7 @@ _INVERTER_MODELS_BY_TYPE = {
     "BG0501": "blueplanet gridsave 50.0 TL3", # 3.3.3
     "BG50TL": "blueplanet gridsave 50.0 TL3", # 3.3.3
     "BQ50TL": "blueplanet voltage source 50.0 TL3", # 3.3.3
-    "092G14": "blueplanet gridsave 92.0 TL3", # 3.3.3
+    "92G14": "blueplanet gridsave 92.0 TL3", # 3.3.3
     "110G15": "blueplanet gridsave 110 TL3", # 3.3.3
     "137G16": "blueplanet gridsave 137 TL3", # 3.3.3
     "160TR": "Powador 16.0 TR3", # 3.3.1
@@ -148,8 +148,8 @@ _INVERTER_MODELS_BY_TYPE = {
     "40kH4P": "blueplanet 40.0 TL3 M1 OD", # 3.3.4
     "32kH4": "blueplanet 32.0 TL3 M3 OD", # 3.3.3
     "40kH4": "blueplanet 40.0 TL3 M3 OD", # 3.3.3
-    "087N13": "blueplanet 87 TL3", # 3.3.5 v
-    "092N14": "blueplanet 92 TL3",
+    "87N13": "blueplanet 87 TL3", # 3.3.5 v
+    "92N14": "blueplanet 92 TL3",
     "100N13": "blueplanet 100 TL3",
     "105N14": "blueplanet 105 TL3",
     "110N15": "blueplanet 110 TL3",
@@ -163,4 +163,8 @@ _INVERTER_MODELS_BY_TYPE = {
 
 
 def resolve_model_name(inverter_type: str) -> str | None:
-    return _INVERTER_MODELS_BY_TYPE.get(inverter_type)
+    model =  _INVERTER_MODELS_BY_TYPE.get(inverter_type)
+    # XXX inverter_type could be padded with a leading "0", re-try with stripped "0"
+    if not model and inverter_type.startswith("0"):
+        model = _INVERTER_MODELS_BY_TYPE.get(inverter_type[1:])
+    return model

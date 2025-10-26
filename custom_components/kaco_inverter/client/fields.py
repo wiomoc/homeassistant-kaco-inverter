@@ -28,7 +28,7 @@ def _expect_char(frame: bytes, position: int, char: str) -> None:
     assert len(char) == 1
     if frame[position] != ord(char):
         raise ProtocolException(
-            f"Expected '{char}', got '{frame[position : position + 1]}'"
+            f"Expected '{char}', got {frame[position : position + 1]}"
         )
 
 
@@ -103,10 +103,10 @@ class ValueField[T](Field, abc.ABC):
 class StringField(ValueField[str]):
     def parse(self, field_value_bytes: bytes) -> str:
         try:
-            return field_value_bytes.lstrip(b"\0").decode("ASCII")
-        except UnicodeEncodeError as e:
+            return field_value_bytes.lstrip(b"\0").decode("ASCII").lstrip()
+        except UnicodeDecodeError as e:
             raise ProtocolException(
-                f"Expected ASCII characters, got '{field_value_bytes}'"
+                f"Expected ASCII characters, got {field_value_bytes}"
             ) from e
 
 
@@ -117,7 +117,7 @@ class IntField(ValueField[int]):
             return int(field_value_string)
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
-                f"Expected integer, got '{field_value_bytes}'"
+                f"Expected integer, got {field_value_bytes}"
             ) from e
 
 
@@ -147,14 +147,14 @@ class FloatField(ValueField[float]):
                 )
             return float(field_value_string)
         except (UnicodeDecodeError, ValueError) as e:
-            raise ProtocolException(f"Expected float, got '{field_value_bytes}'") from e
+            raise ProtocolException(f"Expected float, got {field_value_bytes}") from e
 
 
 class CosPhiField(FloatField):
     def parse(self, field_value_bytes: bytes) -> float:
         if field_value_bytes[-1:] not in {b"c", b"i", b"o"}:
             raise ProtocolException(
-                f"Expected c, i or o, got '{field_value_bytes[-1:]}'"
+                f"Expected c, i or o, got {field_value_bytes[-1:]}"
             )
         return super().parse(field_value_bytes[:-1])
 
@@ -223,11 +223,12 @@ class CrcAndStopField(Field):
         try:
             expected_crc = int(crc_hex.decode("ASCII"), 16)
         except (UnicodeDecodeError, ValueError) as e:
-            raise ProtocolException(f"Expected hex, got '{crc_hex}'") from e
+            raise ProtocolException(f"Expected hex, got {crc_hex}") from e
 
         crc_dc_bytes = frame[1 : position + 1]
-        if not _crc_calculator.verify(crc_dc_bytes, expected_crc):
-            raise ProtocolException("CRC mismatch")
+        actual_crc = _crc_calculator.checksum(crc_dc_bytes)
+        if actual_crc != expected_crc:
+            raise ProtocolException(f"Expected CRC {expected_crc:02X}, got {actual_crc:02X}")
 
         _expect_char(frame, position + 5, "\r")
 
@@ -263,6 +264,7 @@ FIELDS_00_02 = (
 
 FIELDS_000XI = (
     StartField(),
+    IntField("status", 3),
     FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
@@ -288,6 +290,7 @@ FIELDS_000XI = (
 
 FIELDS_XP = (
     StartField(),
+    IntField("status", 3),
     FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),

@@ -53,12 +53,12 @@ class KacoInverterClient:
             command = header[4]
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
-                f"Expected ASCII characters, got '{field_value_bytes}'"
+                f"Expected ASCII characters, got {field_value_bytes}"
             ) from e
         else:
             if address != self._address:
                 raise ProtocolException(
-                    f"Expected response from '{self._address}', got respinse from {address}"
+                    f"Expected response from '{self._address}', got response from '{address}'"
                 )
 
             return command, response
@@ -73,7 +73,10 @@ class KacoInverterClient:
             # Previous .read_until(b"\r") could have been only read until after the legacy checksum
             # as the checksum byte could be "\r" too.
             if position == len(message) and isinstance(field, LegacyChecksumField):
-                message += self._port.read_until(b"\r")
+                try:
+                    message += self._port.read_until(b"\r")
+                except SerialException as e:
+                    raise ProtocolException("Serial port error") from e
         return data_dict
 
     def _handle_kaco_standard_readings(
@@ -101,7 +104,7 @@ class KacoInverterClient:
             for key, value in sub_data_dict.items():
                 data_dict[f"{index}_{key}"] = value
         # 8k1 -> 3x8k, 10k1 -> 3x10k, 11k1 -> 3x11k
-        data_dict["inverter_type"] = f"3x{data_dict['inverter_type'][:-1]}"
+        data_dict["inverter_type"] = f"3x{data_dict['1_inverter_type'][:-1]}"
         self._is_000xi = True
         return data_dict
 
@@ -121,7 +124,7 @@ class KacoInverterClient:
         if response_command == "n":
             return self._handle_generic_readings(response, annotate=annotate)
         raise ProtocolException(
-            f"Expected '0', '4' or 'n' command response, got {response_command}"
+            f"Expected '0', '4' or 'n' command response, got '{response_command}'"
         )
 
     def query_serial_number(self) -> str:
