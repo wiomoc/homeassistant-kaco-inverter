@@ -1,0 +1,13 @@
+{
+    "domain": "kaco_inverter",
+    "name": "KACO new energy",
+    "codeowners": ["@wiomoc"],
+    "integration_type": "device",
+    "iot_class": "local_polling",
+    "requirements": [
+        "crc==7.1.0",
+        "pyserial==3.5"
+    ],
+    "config_flow": true,
+    "version": "2025.10.0"
+}
