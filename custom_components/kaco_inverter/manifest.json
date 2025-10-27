@@ -1,5 +1,5 @@
 {
-    "domain": "kaco_inverter",
+    "domain": "kaco",
     "name": "KACO new energy",
     "codeowners": ["@wiomoc"],
     "integration_type": "device",
@@ -9,5 +9,7 @@
         "pyserial==3.5"
     ],
     "config_flow": true,
-    "version": "2025.10.0"
+    "version": "2025.10.0",
+    "documentation": "https://github.com/wiomoc/homeassistant-kaco-inverter",
+    "issue_tracker": "https://github.com/wiomoc/homeassistant-kaco-inverter/issues"
 }

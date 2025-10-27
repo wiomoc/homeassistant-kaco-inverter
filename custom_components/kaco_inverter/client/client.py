@@ -1,6 +1,8 @@
+"""Client implmentation."""
+
 from collections.abc import Iterable
 from types import TracebackType
-import typing
+from typing import Any, Self
 
 from serial import Serial, SerialException
 
@@ -11,21 +13,19 @@ from .fields import (
     FIELDS_GENERIC,
     FIELDS_SERIAL,
     FIELDS_XP,
-    Field,
     LegacyChecksumField,
+    _Field,
     expect_min_remaining_frame_length,
 )
 
 
 class KacoInverterClient:
-    _port: Serial
-    _address: int  # + m, n
-    _is_000xi: bool
-    _infered_standard_fields: tuple[Field, ...] | None
+    """Client implementation."""
 
-    @staticmethod
-    def create_port(port_name: str):
-        return Serial(port_name, baudrate=9600, timeout=2, write_timeout=1)
+    _port: Serial
+    _address: int
+    _is_000xi: bool
+    _infered_standard_fields: tuple[_Field, ...] | None
 
     def __init__(self, port: str | Serial, address: int) -> None:
         assert 1 <= address <= 99
@@ -33,7 +33,7 @@ class KacoInverterClient:
         self._is_000xi = False
         self._infered_standard_fields = None
         if isinstance(port, str):
-            self._port = KacoInverterClient.create_port(port)
+            self._port = Serial(port, baudrate=9600, timeout=2, write_timeout=1)
         else:
             self._port = port
 
@@ -53,21 +53,20 @@ class KacoInverterClient:
             command = header[4]
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
-                f"Expected ASCII characters, got {field_value_bytes}"
+                f"Expected ASCII characters, got {field_value_bytes!r}"
             ) from e
-        else:
-            if address != self._address:
-                raise ProtocolException(
-                    f"Expected response from '{self._address}', got response from '{address}'"
-                )
+        if address != self._address:
+            raise ProtocolException(
+                f"Expected response from '{self._address}', got response from '{address}'"
+            )
 
-            return command, response
+        return command, response
 
     def _parse_fields(
-        self, fields: Iterable[Field], message: bytes, annotate: bool = False
-    ) -> dict[str, typing.Any]:
+        self, fields: Iterable[_Field], message: bytes, annotate: bool = False
+    ) -> dict[str, Any]:
         position = 0
-        data_dict = {}
+        data_dict: dict[str, Any] = {}
         for field in fields:
             position = field.read(message, position, data_dict, annotate=annotate)
             # Previous .read_until(b"\r") could have been only read until after the legacy checksum
@@ -81,7 +80,7 @@ class KacoInverterClient:
 
     def _handle_kaco_standard_readings(
         self, message: bytes, annotate: bool = False
-    ) -> dict[str, typing.Any]:
+    ) -> dict[str, Any]:
         if self._infered_standard_fields:
             return self._parse_fields(
                 self._infered_standard_fields, message, annotate=annotate
@@ -95,7 +94,7 @@ class KacoInverterClient:
 
         return data_dict
 
-    def _query_000xi_readings(self, annotate: bool = False) -> dict[str, typing.Any]:
+    def _query_000xi_readings(self, annotate: bool = False) -> dict[str, Any]:
         data_dict = {}
         for index in ["1", "2", "3"]:
             reponse_command, message = self._send_command(index)
@@ -110,10 +109,22 @@ class KacoInverterClient:
 
     def _handle_generic_readings(
         self, message: bytes, annotate: bool = False
-    ) -> dict[str, typing.Any]:
+    ) -> dict[str, Any]:
         return self._parse_fields(FIELDS_GENERIC, message, annotate=annotate)
 
-    def query_readings(self, annotate: bool = False) -> dict[str, typing.Any]:
+    def query_readings(self, annotate: bool = False) -> dict[str, Any]:
+        """Query the current reading from the inverter.
+
+        Args:
+            annotate: True if values should be wrapped into AnnotatedValue,
+            which contains quantity and description of the value. Defaults to False.
+
+        Raises:
+            ProtocolException: When there was a protocol error during communication
+
+        Returns:
+            dict of measurements
+        """
         if self._is_000xi:
             return self._query_000xi_readings(annotate=annotate)
         response_command, response = self._send_command("0")
@@ -128,6 +139,10 @@ class KacoInverterClient:
         )
 
     def query_serial_number(self) -> str:
+        """Query the serial number of the inverter.
+
+        Only supported by inverters using the generic protocol.
+        """
         response_command, response = self._send_command("s")
         if response_command != "s":
             raise ProtocolException(
@@ -136,7 +151,8 @@ class KacoInverterClient:
         data_dict = self._parse_fields(FIELDS_SERIAL, response)
         return data_dict["serial_number"]
 
-    def __enter__(self) -> typing.Self:
+    def __enter__(self) -> Self:
+        """Re-open the used serial port, if not already open."""
         if not self._port.is_open:
             self.open()
         return self
@@ -146,12 +162,15 @@ class KacoInverterClient:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
+        """Close the used serial port, if not already closed."""
         if self._port.is_open:
             self.close()
 
     def open(self):
+        """Re-open the used serial port."""
         self._port.open()
 
     def close(self):
+        """Close the used serial port."""
         self._port.close()

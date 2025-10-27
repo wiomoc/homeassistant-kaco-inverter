@@ -1,26 +1,41 @@
+"""Definition of the fields returned in the responses by the inverter."""
+
 import abc
-from dataclasses import dataclass
 import typing
+from dataclasses import dataclass
 
 import crc
 
 from . import ProtocolException
 
 
-class Field(typing.Protocol):
+class _Field(typing.Protocol):
     def read(
         self,
         frame: bytes,
         position: int,
         dest_dict: dict[str, typing.Any],
         annotate: bool,
-    ) -> int: ...
+    ) -> int:
+        """Read the field based on the given frame at the given position.
+
+        Args:
+            frame: Frame to read from
+            position: Start position to read at
+            dest_dict: Dict to write the read and parsed value to
+            annotate (bool): True if the read and parsed value should be wrapped
+                into an AnnotatedValue object
+
+        Returns:
+            int: Cursor position after reading the field
+        """
 
 
 def expect_min_remaining_frame_length(
-    frame: bytes, position: int, expected_length: int
+    frame: bytes, position: int, min_remaining_length: int
 ) -> None:
-    if len(frame) < (position + expected_length):
+    """Validiate the frame to have a minimum of remaining bytes."""
+    if len(frame) < (position + min_remaining_length):
         raise ProtocolException("Unexpected end-of-frame")
 
 
@@ -28,18 +43,20 @@ def _expect_char(frame: bytes, position: int, char: str) -> None:
     assert len(char) == 1
     if frame[position] != ord(char):
         raise ProtocolException(
-            f"Expected '{char}', got {frame[position : position + 1]}"
+            f"Expected '{char}', got {frame[position : position + 1]!r}"
         )
 
 
 @dataclass
 class AnnotatedValue[T]:
+    """Representation of a value with a quantity and a human-readable description."""
+
     value: T
     quantity: str
     description: str
 
 
-class ValueField[T](Field, abc.ABC):
+class _ValueField[T](_Field, abc.ABC):
     _name: str
     _length: int | None
     _quantity: str | None
@@ -49,6 +66,7 @@ class ValueField[T](Field, abc.ABC):
         self,
         name: str,
         length: int | None = None,
+        /,
         quantity: str | None = None,
         description: str | None = None,
     ):
@@ -97,42 +115,47 @@ class ValueField[T](Field, abc.ABC):
 
     @abc.abstractmethod
     def parse(self, field_value_bytes: bytes) -> T:
-        pass
+        """Parse the given raw field value bytes to a native value."""
 
 
-class StringField(ValueField[str]):
+class _StringField(_ValueField[str]):
+    """Represents a floating-point number field (' abcd')."""
+
     def parse(self, field_value_bytes: bytes) -> str:
         try:
             return field_value_bytes.lstrip(b"\0").decode("ASCII").lstrip()
         except UnicodeDecodeError as e:
             raise ProtocolException(
-                f"Expected ASCII characters, got {field_value_bytes}"
+                f"Expected ASCII characters, got {field_value_bytes!r}"
             ) from e
 
 
-class IntField(ValueField[int]):
+class _IntField(_ValueField[int]):
+    """Represents a floating-point number field ('1234')."""
+
     def parse(self, field_value_bytes: bytes) -> int:
         try:
             field_value_string = field_value_bytes.decode("ASCII").lstrip()
             return int(field_value_string)
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
-                f"Expected integer, got {field_value_bytes}"
+                f"Expected integer, got {field_value_bytes!r}"
             ) from e
 
 
-class FloatField(ValueField[float]):
+class _FloatField(_ValueField[float]):
+    """Represents a floating-point number field ('123.45')."""
+
     _precision: int | None
 
     def __init__(
         self,
-        name: str,
-        length: int | None = None,
-        precision: int | None = None,
+        /,
         *args,
+        precision: int | None = None,
         **kwargs,
     ):
-        super().__init__(name, length, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._precision = precision
 
     def parse(self, field_value_bytes: bytes) -> float:
@@ -147,19 +170,21 @@ class FloatField(ValueField[float]):
                 )
             return float(field_value_string)
         except (UnicodeDecodeError, ValueError) as e:
-            raise ProtocolException(f"Expected float, got {field_value_bytes}") from e
+            raise ProtocolException(f"Expected float, got {field_value_bytes!r}") from e
 
 
-class CosPhiField(FloatField):
+class _CosPhiField(_FloatField):
     def parse(self, field_value_bytes: bytes) -> float:
         if field_value_bytes[-1:] not in {b"c", b"i", b"o"}:
             raise ProtocolException(
-                f"Expected c, i or o, got {field_value_bytes[-1:]}"
+                f"Expected c, i or o, got {field_value_bytes[-1:]!r}"
             )
         return super().parse(field_value_bytes[:-1])
 
 
-class DurationField(ValueField[int]):
+class _DurationField(_ValueField[int]):
+    """Represents a duration field ('hhhhhh:mm')."""
+
     def parse(self, field_value_bytes: bytes) -> int:
         _expect_char(field_value_bytes, -3, ":")
         try:
@@ -168,11 +193,16 @@ class DurationField(ValueField[int]):
             minutes = int(field_value_string[-2:])
             return 60 * hours + minutes
         except (UnicodeDecodeError, ValueError) as e:
-            raise ProtocolException(f"Expected duration, got '{field_value_bytes}'") from e
+            raise ProtocolException(
+                f"Expected duration, got '{field_value_bytes!r}'"
+            ) from e
 
 
-class LegacyChecksumField(Field):
-    def read(self, frame: bytes, position: int, *args, **kwargs) -> int:
+class LegacyChecksumField(_Field):
+    """Represents a one-byte checksum used in the legacy protocol."""
+
+    def read(self, frame: bytes, position: int, *_args, **_kwargs) -> int:
+        """Read the field and validate the checksum."""
         expect_min_remaining_frame_length(frame, position, 2)
         _expect_char(frame, position, " ")
         excepted_checksum = frame[position + 1]
@@ -185,8 +215,10 @@ class LegacyChecksumField(Field):
         return position + 2
 
 
-class StartField(Field):
-    def read(self, frame: bytes, position: int, *args, **kwargs) -> int:
+class _StartField(_Field):
+    r"""Represents the start of a frame('\n*<ADR><COMMAND> ')."""
+
+    def read(self, frame: bytes, position: int, *_args, **_kwargs) -> int:
         length = 5
         assert position == 0
         expect_min_remaining_frame_length(frame, position, length)
@@ -196,14 +228,16 @@ class StartField(Field):
             frame[2:position].decode("ASCII")
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
-                f"Expected address and command, got {frame[2:position]}"
+                f"Expected address and command, got {frame[2:position]!r}"
             ) from e
 
         return position + length
 
 
-class LegacyStopField(Field):
-    def read(self, frame: bytes, position: int, *args, **kwargs) -> int:
+class _LegacyStopField(_Field):
+    r"""Represents the end of a frame ('\r') ."""
+
+    def read(self, frame: bytes, position: int, *_args, **_kwargs) -> int:
         expect_min_remaining_frame_length(frame, position, 1)
         _expect_char(frame, position, "\r")
         if len(frame) > (position + 1):
@@ -214,8 +248,10 @@ class LegacyStopField(Field):
 _crc_calculator = crc.Calculator(crc.Crc16.X25.value)
 
 
-class CrcAndStopField(Field):
-    def read(self, frame: bytes, position: int, *args, **kwargs):
+class _CrcAndStopField(_Field):
+    """Represents a CRC16 checksum used in the generic protocol."""
+
+    def read(self, frame: bytes, position: int, *_args, **_kwargs):
         length = 6
         expect_min_remaining_frame_length(frame, position, length)
         _expect_char(frame, position, " ")
@@ -223,12 +259,14 @@ class CrcAndStopField(Field):
         try:
             expected_crc = int(crc_hex.decode("ASCII"), 16)
         except (UnicodeDecodeError, ValueError) as e:
-            raise ProtocolException(f"Expected hex, got {crc_hex}") from e
+            raise ProtocolException(f"Expected hex, got {crc_hex!r}") from e
 
         crc_dc_bytes = frame[1 : position + 1]
         actual_crc = _crc_calculator.checksum(crc_dc_bytes)
         if actual_crc != expected_crc:
-            raise ProtocolException(f"Expected CRC {expected_crc:02X}, got {actual_crc:02X}")
+            raise ProtocolException(
+                f"Expected CRC {expected_crc:02X}, got {actual_crc:02X}"
+            )
 
         _expect_char(frame, position + 5, "\r")
 
@@ -237,100 +275,100 @@ class CrcAndStopField(Field):
 
 
 FIELDS_00_02 = (
-    StartField(),
-    IntField("status", 3),
-    FloatField(
+    _StartField(),
+    _IntField("status", 3),
+    _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
-    FloatField(
+    _FloatField(
         "dc_current", 5, precision=2, quantity="A", description="Generator Current"
     ),
-    IntField("dc_power", 5, quantity="W", description="Generator Power"),
-    FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
-    FloatField(
+    _IntField("dc_power", 5, quantity="W", description="Generator Power"),
+    _FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
+    _FloatField(
         "ac_current",
         5,
         precision=2,
         quantity="A",
         description="Grid- / Grid-feeding Current",
     ),
-    IntField("ac_power", 5, quantity="W", description="Delivered (fed-in) Power"),
-    IntField("device_temperature", 3, quantity="°C", description="Device Temperature"),
-    IntField("daily_yield", 6, quantity="Wh", description="Daily Yield"),
+    _IntField("ac_power", 5, quantity="W", description="Delivered (fed-in) Power"),
+    _IntField("device_temperature", 3, quantity="°C", description="Device Temperature"),
+    _IntField("daily_yield", 6, quantity="Wh", description="Daily Yield"),
     LegacyChecksumField(),
-    StringField("inverter_type", 6),
-    LegacyStopField(),
+    _StringField("inverter_type", 6),
+    _LegacyStopField(),
 )
 
 FIELDS_000XI = (
-    StartField(),
-    IntField("status", 3),
-    FloatField(
+    _StartField(),
+    _IntField("status", 3),
+    _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
-    FloatField(
+    _FloatField(
         "dc_current", 5, precision=2, quantity="A", description="Generator Current"
     ),
-    IntField("dc_power", 6, quantity="W", description="Generator Power"),
-    FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
-    FloatField(
+    _IntField("dc_power", 6, quantity="W", description="Generator Power"),
+    _FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
+    _FloatField(
         "ac_current",
         5,
         precision=2,
         quantity="A",
         description="Grid- / Grid-feeding Current",
     ),
-    IntField("ac_power", 6, quantity="W", description="Delivered (fed-in) Power"),
-    IntField("device_temperature", 2, quantity="°C", description="Device Temperature"),
-    IntField("daily_yield", 6, quantity="Wh", description="Daily Yield"),
+    _IntField("ac_power", 6, quantity="W", description="Delivered (fed-in) Power"),
+    _IntField("device_temperature", 2, quantity="°C", description="Device Temperature"),
+    _IntField("daily_yield", 6, quantity="Wh", description="Daily Yield"),
     LegacyChecksumField(),
-    StringField("inverter_type", 4),
-    LegacyStopField(),
+    _StringField("inverter_type", 4),
+    _LegacyStopField(),
 )
 
 FIELDS_XP = (
-    StartField(),
-    IntField("status", 3),
-    FloatField(
+    _StartField(),
+    _IntField("status", 3),
+    _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
-    FloatField(
+    _FloatField(
         "dc_current", 6, precision=2, quantity="A", description="Generator Current"
     ),
-    IntField("dc_power", 6, quantity="W", description="Generator Power"),
-    FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
-    FloatField(
+    _IntField("dc_power", 6, quantity="W", description="Generator Power"),
+    _FloatField("ac_voltage", 5, precision=1, quantity="V", description="Grid Voltage"),
+    _FloatField(
         "ac_current",
         6,
         precision=2,
         quantity="A",
         description="Grid- / Grid-feeding Current",
     ),
-    IntField("ac_power", 6, quantity="W", description="Delivered (fed-in) Power"),
-    IntField("device_temperature", 2, quantity="°C", description="Device Temperature"),
-    IntField("daily_yield", 7, quantity="Wh", description="Daily Yield"),
+    _IntField("ac_power", 6, quantity="W", description="Delivered (fed-in) Power"),
+    _IntField("device_temperature", 2, quantity="°C", description="Device Temperature"),
+    _IntField("daily_yield", 7, quantity="Wh", description="Daily Yield"),
     LegacyChecksumField(),
-    StringField("inverter_type", 6),
-    IntField("total_yield", 9, quantity="kWh", description="Total Yield"),
-    LegacyStopField(),
+    _StringField("inverter_type", 6),
+    _IntField("total_yield", 9, quantity="kWh", description="Total Yield"),
+    _LegacyStopField(),
 )
 
-FIELDS_SERIAL = (StartField(), StringField("serial_number"), CrcAndStopField())
+FIELDS_SERIAL = (_StartField(), _StringField("serial_number"), _CrcAndStopField())
 
 
 def _build_mpp_fields(index: int):
     return (
-        FloatField(
+        _FloatField(
             f"dc_mppt{index}_voltage",
             quantity="V",
             description=f"DC Voltage of MPPT{index}",
         ),
-        FloatField(
+        _FloatField(
             f"dc_mppt{index}_current",
             quantity="A",
             description=f"DC Current of MPPT{index}",
         ),
-        IntField(
+        _IntField(
             f"dc_mppt{index}_power",
             quantity="W",
             description=f"DC Power of MPPT{index}",
@@ -339,28 +377,28 @@ def _build_mpp_fields(index: int):
 
 
 _AC_FIELDS = (
-    FloatField("ac_phase1_voltage", quantity="V", description="AC Voltage of Phase 1"),
-    FloatField("ac_phase1_current", quantity="A", description="AC Current of Phase 1"),
-    FloatField("ac_phase2_voltage", quantity="V", description="AC Voltage of Phase 2"),
-    FloatField("ac_phase2_current", quantity="A", description="AC Current of Phase 2"),
-    FloatField("ac_phase3_voltage", quantity="V", description="AC Voltage of Phase 3"),
-    FloatField("ac_phase3_current", quantity="A", description="AC Current of Phase 3"),
+    _FloatField("ac_phase1_voltage", quantity="V", description="AC Voltage of Phase 1"),
+    _FloatField("ac_phase1_current", quantity="A", description="AC Current of Phase 1"),
+    _FloatField("ac_phase2_voltage", quantity="V", description="AC Voltage of Phase 2"),
+    _FloatField("ac_phase2_current", quantity="A", description="AC Current of Phase 2"),
+    _FloatField("ac_phase3_voltage", quantity="V", description="AC Voltage of Phase 3"),
+    _FloatField("ac_phase3_current", quantity="A", description="AC Current of Phase 3"),
 )
 
 _COMMON_POWER_FIELDS = (
-    IntField("dc_power", quantity="W", description="DC Power"),
-    IntField("ac_power", quantity="W", description="AC Power"),
+    _IntField("dc_power", quantity="W", description="DC Power"),
+    _IntField("ac_power", quantity="W", description="AC Power"),
 )
 _COMMON_MISC_FIELDS = (
-    CosPhiField("cos_phi"),
-    FloatField(
+    _CosPhiField("cos_phi"),
+    _FloatField(
         "device_temperature", quantity="°C", description="Circuit Board Temperature"
     ),
-    IntField("daily_yield", quantity="Wh", description="Daily Yield"),
+    _IntField("daily_yield", quantity="Wh", description="Daily Yield"),
 )
 
 
-def _resolve_subfields(inverter_type: str) -> list[Field]:
+def _resolve_subfields(_inverter_type: str) -> list[_Field]:
     return [
         *_build_mpp_fields(1),
         *_build_mpp_fields(2),
@@ -370,7 +408,7 @@ def _resolve_subfields(inverter_type: str) -> list[Field]:
     ]
 
 
-class GenericPayloadField(Field):
+class _GenericPayloadField(_Field):
     def read(
         self,
         frame: bytes,
@@ -384,7 +422,8 @@ class GenericPayloadField(Field):
         subfields = _resolve_subfields(inverter_type)
         if (len(subfields) + 3) != number_of_elements:
             raise ProtocolException(
-                f"Expected {len(subfields) + 3} elements for type '{inverter_type}', got {number_of_elements}"
+                f"Expected {len(subfields) + 3} elements for type '{inverter_type}', "
+                f"got {number_of_elements}"
             )
         for subfield in subfields:
             position = subfield.read(frame, position, dest_dict, *args, **kwargs)
@@ -393,10 +432,10 @@ class GenericPayloadField(Field):
 
 
 FIELDS_GENERIC = (
-    StartField(),
-    IntField("number_of_elements"),
-    StringField("inverter_type"),
-    IntField("status"),
-    GenericPayloadField(),
-    CrcAndStopField(),
+    _StartField(),
+    _IntField("number_of_elements"),
+    _StringField("inverter_type"),
+    _IntField("status"),
+    _GenericPayloadField(),
+    _CrcAndStopField(),
 )

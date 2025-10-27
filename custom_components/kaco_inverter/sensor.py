@@ -1,7 +1,7 @@
-"""Platform for integration of KACO inverter readings."""
+"""Platform for integration of KACO inverters via RS485."""
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -29,6 +29,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util import slugify
 
 from .client import ProtocolException
 from .client.client import KacoInverterClient
@@ -60,16 +61,47 @@ async def async_setup_entry(
 
 _QUANTITY_MAPPING = {
     "W": (SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT),
-    "kW": (SensorDeviceClass.POWER, UnitOfPower.KILO_WATT, SensorStateClass.MEASUREMENT),
-    "Wh": (SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.TOTAL_INCREASING),
-    "kWh": (SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.TOTAL_INCREASING),
-    "V": (SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT, SensorStateClass.MEASUREMENT),
-    "A": (SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE, SensorStateClass.MEASUREMENT),
-    "°C": (SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS, SensorStateClass.MEASUREMENT),
-    "min": (SensorDeviceClass.DURATION, UnitOfTime.MINUTES, SensorStateClass.TOTAL_INCREASING)
+    "kW": (
+        SensorDeviceClass.POWER,
+        UnitOfPower.KILO_WATT,
+        SensorStateClass.MEASUREMENT,
+    ),
+    "Wh": (
+        SensorDeviceClass.ENERGY,
+        UnitOfEnergy.WATT_HOUR,
+        SensorStateClass.TOTAL_INCREASING,
+    ),
+    "kWh": (
+        SensorDeviceClass.ENERGY,
+        UnitOfEnergy.KILO_WATT_HOUR,
+        SensorStateClass.TOTAL_INCREASING,
+    ),
+    "V": (
+        SensorDeviceClass.VOLTAGE,
+        UnitOfElectricPotential.VOLT,
+        SensorStateClass.MEASUREMENT,
+    ),
+    "A": (
+        SensorDeviceClass.CURRENT,
+        UnitOfElectricCurrent.AMPERE,
+        SensorStateClass.MEASUREMENT,
+    ),
+    "°C": (
+        SensorDeviceClass.TEMPERATURE,
+        UnitOfTemperature.CELSIUS,
+        SensorStateClass.MEASUREMENT,
+    ),
+    "min": (
+        SensorDeviceClass.DURATION,
+        UnitOfTime.MINUTES,
+        SensorStateClass.TOTAL_INCREASING,
+    ),
 }
 
-def _build_sensor_entity_descriptions(data_dict: dict[str, Any]) -> list[SensorEntityDescription]:
+
+def _build_sensor_entity_descriptions(
+    data_dict: dict[str, Any],
+) -> list[SensorEntityDescription]:
     descriptions = []
     for key, value in data_dict.items():
         if not isinstance(value, AnnotatedValue):
@@ -91,18 +123,21 @@ def _build_sensor_entity_descriptions(data_dict: dict[str, Any]) -> list[SensorE
 
 
 class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Coordinator for fetching all measurments via a single reading."""
+
     _client: KacoInverterClient | None
     device_info: DeviceInfo | None
     sensor_entity_descriptions: list[SensorEntityDescription]
+    device_identifier: str | None
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry):
+        """Initialize the coordinator."""
         super().__init__(
             hass,
             _LOGGER,
-            name="My sensor",
+            name="Kaco Inverter",
             config_entry=config_entry,
             update_interval=timedelta(seconds=30),
-            always_update=False,
         )
         self.device_info = None
         self._client = None
@@ -128,23 +163,29 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         and expected_serial_number != actual_serial_number
                     ):
                         raise ConfigEntryError(
-                            f"Serial number mismatch: {actual_serial_number} != {expected_serial_number}"
+                            "Serial number mismatch: "
+                            f"{actual_serial_number} != {expected_serial_number}"
                         )
         except Exception as e:
             self._client = None
             raise UpdateFailed("Can't connect to inverter") from e
+
+        inverter_type = initial_reading["inverter_type"]
+        self.sensor_entity_descriptions = _build_sensor_entity_descriptions(
+            initial_reading
+        )
+        if actual_serial_number:
+            identifier = slugify(actual_serial_number)
         else:
-            inverter_type = initial_reading["inverter_type"]
-            self.sensor_entity_descriptions = _build_sensor_entity_descriptions(
-                initial_reading
-            )
-            self.device_info = DeviceInfo(
-                manufacturer="KACO new energy",
-                model_id=inverter_type,
-                model=resolve_model_name(inverter_type),
-                serial_number=actual_serial_number,
-                connections={(DOMAIN, f"{port_name}: {inverter_address:02}")},
-            )
+            identifier = f"{slugify(port_name)}__{inverter_address:02}"
+        self.device_identifier = identifier
+        self.device_info = DeviceInfo(
+            manufacturer="KACO new energy",
+            model_id=inverter_type,
+            model=resolve_model_name(inverter_type),
+            serial_number=actual_serial_number,
+            identifiers={(DOMAIN, identifier)},
+        )
 
     async def _async_update_data(self) -> dict[str, Any]:
         def _update_data():
@@ -160,10 +201,13 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except ProtocolException as e:
                 self._client = None
                 raise UpdateFailed("Can't connect to inverter") from e
+
         return await self.hass.async_add_executor_job(_update_data)
 
 
 class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
+    """Representation of a sensor."""
+
     _attr_has_entity_name = True
 
     def __init__(
@@ -171,14 +215,12 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
         coordinator: KacoInverterCoordinator,
         entity_description: SensorEntityDescription,
     ) -> None:
-        super().__init__(coordinator, context=entity_description.key)
+        super().__init__(coordinator)
         self.entity_description = entity_description
-        device_info = coordinator.device_info
-        if device_info is None:
-            raise ConfigEntryError("Missing device info")
-        if serial_number := device_info.get("serial_number"):
-            self._attr_unique_id = f"{serial_number}_{entity_description.key}"
-        self._attr_device_info = device_info
+        self._attr_unique_id = (
+            f"{coordinator.device_identifier}_{entity_description.key}"
+        )
+        self._attr_device_info = coordinator.device_info
 
     @callback
     def _handle_coordinator_update(self) -> None:

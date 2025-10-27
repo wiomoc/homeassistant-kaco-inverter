@@ -1,2 +1,5 @@
+"""Client for connecting to KACO inverters and reading current values."""
+
+
 class ProtocolException(Exception):
-    pass
+    """Exception raised because a protocol error while commoncating with the inverter."""

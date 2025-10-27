@@ -1,10 +1,12 @@
+"""Config Flow."""
+
 import contextlib
 from dataclasses import dataclass
+from typing import Any
 
 import serial.tools.list_ports
 import voluptuous as vol
-
-from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_PORT
 
 from .client.client import KacoInverterClient, ProtocolException
@@ -18,7 +20,9 @@ class _ConnectionInfo:
     serial_number: str | None
 
 
-def _try_connect(serial_port_path: str, inverter_address: int) -> _ConnectionInfo | None:
+def _try_connect(
+    serial_port_path: str, inverter_address: int
+) -> _ConnectionInfo | None:
     try:
         with KacoInverterClient(serial_port_path, inverter_address) as client:
             readings = client.query_readings()
@@ -32,16 +36,19 @@ def _try_connect(serial_port_path: str, inverter_address: int) -> _ConnectionInf
         return None
 
 
-class KacoInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 1
-    MINOR_VERSION = 0
+class KacoInverterConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Config Flow for setting up a single KACO device."""
 
-    async def async_step_user(self, info):
+    VERSION = 1
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Step when user initializes the integration."""
         errors: dict[str, str] = {}
-        if info is not None:
+        if user_input is not None:
             connection_info = await self.hass.async_add_executor_job(
-                lambda: _try_connect(info[CONF_PORT], info[CONF_INVERTER_ADDRESS])
+                lambda: _try_connect(
+                    user_input[CONF_PORT], user_input[CONF_INVERTER_ADDRESS]
+                )
             )
             if not connection_info:
                 errors["base"] = "cannot_connect"
@@ -52,8 +59,8 @@ class KacoInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(connection_info.serial_number)
                     self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=f"KACO {connection_info.model} #{info[CONF_INVERTER_ADDRESS]:02}",
-                    data={**info, **extra_data},
+                    title=f"KACO {connection_info.model} #{user_input[CONF_INVERTER_ADDRESS]:02}",
+                    data={**user_input, **extra_data},
                 )
 
         ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)

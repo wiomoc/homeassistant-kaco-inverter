@@ -1,1 +1,1 @@
-# KACO Inverter Integration
+# Integration for PV inverters from KACO
