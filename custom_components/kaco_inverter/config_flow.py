@@ -8,6 +8,7 @@ import serial.tools.list_ports
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_PORT
+from serial import SerialException
 
 from .client.client import KacoInverterClient, ProtocolException
 from .client.model_names import resolve_model_name
@@ -32,7 +33,7 @@ def _try_connect(
             with contextlib.suppress(ProtocolException):
                 serial_number = client.query_serial_number()
         return _ConnectionInfo(model=model, serial_number=serial_number)
-    except ProtocolException:
+    except (SerialException, ProtocolException):
         return None
 
 
@@ -65,7 +66,7 @@ class KacoInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
         list_of_ports = {
-            port.device_path: f"{port}, s/n: {port.serial_number or 'n/a'}"
+            port.device: f"{port}, s/n: {port.serial_number or 'n/a'}"
             + (f" - {port.manufacturer}" if port.manufacturer else "")
             for port in ports
         }
@@ -79,4 +80,5 @@ class KacoInverterConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            errors=errors,
         )

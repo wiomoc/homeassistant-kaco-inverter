@@ -1,7 +1,5 @@
 """Platform for integration of KACO inverters via RS485."""
 
-import logging
-from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -12,7 +10,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONF_PORT,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -21,42 +18,15 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryError
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
 )
-from homeassistant.util import slugify
 
-from .client import ProtocolException
-from .client.client import KacoInverterClient
 from .client.fields import AnnotatedValue
-from .client.model_names import resolve_model_name
-from .const import CONF_INVERTER_ADDRESS, CONF_SERIAL_NUMBER, DOMAIN
-
-_LOGGER = logging.getLogger(__name__)
+from .coordinator import KacoInverterCoordinator
 
 PARALLEL_UPDATES = 1
-
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
-) -> None:
-    """Setup the inverter entities."""
-
-    coordinator = KacoInverterCoordinator(hass, entry)
-
-    await coordinator.async_config_entry_first_refresh()
-
-    async_add_entities(
-        KacoSensor(coordinator, sensor_entity_type)
-        for sensor_entity_type in coordinator.sensor_entity_descriptions
-    )
 
 
 _QUANTITY_MAPPING = {
@@ -122,87 +92,25 @@ def _build_sensor_entity_descriptions(
     return descriptions
 
 
-class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Coordinator for fetching all measurments via a single reading."""
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Setup the inverter entities."""
 
-    _client: KacoInverterClient | None
-    device_info: DeviceInfo | None
-    sensor_entity_descriptions: list[SensorEntityDescription]
-    device_identifier: str | None
+    coordinator = KacoInverterCoordinator(hass, entry)
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry):
-        """Initialize the coordinator."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            name="Kaco Inverter",
-            config_entry=config_entry,
-            update_interval=timedelta(seconds=30),
+    annotated_initial_reading = (
+        await coordinator.async_config_entry_first_refresh_annotated()
+    )
+
+    async_add_entities(
+        KacoSensor(coordinator, sensor_entity_type)
+        for sensor_entity_type in _build_sensor_entity_descriptions(
+            annotated_initial_reading
         )
-        self.device_info = None
-        self._client = None
-
-    async def _async_setup(self):
-        assert self.config_entry
-        config = self.config_entry.data
-        port_name = config[CONF_PORT]
-        inverter_address = config[CONF_INVERTER_ADDRESS]
-        self._client = KacoInverterClient(port=port_name, address=inverter_address)
-        try:
-            with self._client as client:
-                initial_reading = client.query_readings(annotate=True)
-                actual_serial_number = None
-                try:
-                    actual_serial_number = client.query_serial_number()
-                except ProtocolException:
-                    pass
-                else:
-                    expected_serial_number = config.get(CONF_SERIAL_NUMBER)
-                    if (
-                        expected_serial_number
-                        and expected_serial_number != actual_serial_number
-                    ):
-                        raise ConfigEntryError(
-                            "Serial number mismatch: "
-                            f"{actual_serial_number} != {expected_serial_number}"
-                        )
-        except Exception as e:
-            self._client = None
-            raise UpdateFailed("Can't connect to inverter") from e
-
-        inverter_type = initial_reading["inverter_type"]
-        self.sensor_entity_descriptions = _build_sensor_entity_descriptions(
-            initial_reading
-        )
-        if actual_serial_number:
-            identifier = slugify(actual_serial_number)
-        else:
-            identifier = f"{slugify(port_name)}__{inverter_address:02}"
-        self.device_identifier = identifier
-        self.device_info = DeviceInfo(
-            manufacturer="KACO new energy",
-            model_id=inverter_type,
-            model=resolve_model_name(inverter_type),
-            serial_number=actual_serial_number,
-            identifiers={(DOMAIN, identifier)},
-        )
-
-    async def _async_update_data(self) -> dict[str, Any]:
-        def _update_data():
-            try:
-                if not self._client:
-                    assert self.config_entry
-                    config = self.config_entry.data
-                    self._client = KacoInverterClient(
-                        port=config[CONF_PORT], address=config[CONF_INVERTER_ADDRESS]
-                    )
-                with self._client as client:
-                    return client.query_readings()
-            except ProtocolException as e:
-                self._client = None
-                raise UpdateFailed("Can't connect to inverter") from e
-
-        return await self.hass.async_add_executor_job(_update_data)
+    )
 
 
 class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):

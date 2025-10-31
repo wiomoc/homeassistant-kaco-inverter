@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -7,6 +8,18 @@ from custom_components.kaco_inverter.client import ProtocolException
 from custom_components.kaco_inverter.client.client import KacoInverterClient
 from custom_components.kaco_inverter.client.fields import FIELDS_00_02, AnnotatedValue
 from custom_components.kaco_inverter.client.model_names import resolve_model_name
+
+
+@pytest.fixture
+def pyserial_serial_port() -> Generator[MagicMock]:
+    port_obj_mock = MagicMock()
+
+    with patch(
+        "custom_components.kaco_inverter.client.client.Serial",
+        MagicMock(return_value=port_obj_mock),
+        create=True,
+    ):
+        yield port_obj_mock
 
 
 @pytest.mark.parametrize(
@@ -137,8 +150,9 @@ def test_query_readings(
 
 
 @pytest.mark.parametrize("has_cached_is_000xi", [True, False])
-def test_000xi_query_readings(has_cached_is_000xi: bool):
-    port_mock = MagicMock()
+def test_000xi_query_readings(
+    has_cached_is_000xi: bool, pyserial_serial_port: MagicMock
+):
     responses = [
         b"\n*021   4 186.8 11.29 123621 136.1 13.45   1558 12  13401 \x23  8k1\r",
         b"\n*022   5 286.8 21.29 223621 236.1 23.45   2558 22  23401 \x2d  8k2\r",
@@ -146,8 +160,6 @@ def test_000xi_query_readings(has_cached_is_000xi: bool):
     ]
     if not has_cached_is_000xi:
         responses.insert(0, b"\n*024\r")
-    port_mock.is_open = False
-    port_mock.read_until.side_effect = responses
 
     expected_result = {
         "1_status": 4,
@@ -184,14 +196,18 @@ def test_000xi_query_readings(has_cached_is_000xi: bool):
     }
 
     inverter_address = 2
-    with KacoInverterClient(port_mock, inverter_address) as client:
+
+    pyserial_serial_port.is_open = False
+    pyserial_serial_port.read_until.side_effect = responses
+
+    with KacoInverterClient("COM1", inverter_address) as client:
         client._is_000xi = has_cached_is_000xi
         result = client.query_readings(annotate=False)
         assert result == expected_result
         assert client._is_000xi
-        port_mock.is_open = True
-    port_mock.open.assert_called()
-    port_mock.close.assert_called()
+        pyserial_serial_port.is_open = True
+    pyserial_serial_port.open.assert_called()
+    pyserial_serial_port.close.assert_called()
 
 
 def test_query_split_by_cr_checksum():

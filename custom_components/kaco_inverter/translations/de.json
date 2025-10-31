@@ -1,0 +1,19 @@
+{
+    "config": {
+        "flow_title": "KACO Wechselrichter integrieren",
+        "step": {
+            "user": {
+                "data": {
+                    "port": "Serieller Port",
+                    "address": "Adresse"
+                },
+                "data_description": {
+                    "address": "Adresse des Wechselrichters auf dem RS485 Bus. (Gleich zur Modbus Addresse)"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Verbindung fehlgeschlagen"
+        }
+    }
+}

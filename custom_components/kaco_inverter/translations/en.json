@@ -1,0 +1,19 @@
+{
+    "config": {
+        "flow_title": "Integrate KACO Inverter",
+        "step": {
+            "user": {
+                "data": {
+                    "port": "Serial Port",
+                    "address": "Address"
+                },
+                "data_description": {
+                    "address": "Address of the inverter on the RS485 bus. (Same as the Modbus address)"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to Connect"
+        }
+    }
+}
