@@ -52,7 +52,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unknown',
+    'state': '1.23',
   })
 # ---
 # name: test_all_entities[sensor.mock_title_daily_yield-entry]
@@ -108,7 +108,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unknown',
+    'state': '3431',
   })
 # ---
 # name: test_all_entities[sensor.mock_title_dc_power-entry]
@@ -164,7 +164,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unknown',
+    'state': '400',
   })
 # ---
 # name: test_all_entities[sensor.mock_title_dc_voltage-entry]
@@ -220,7 +220,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unknown',
+    'state': '232.1',
   })
 # ---
 # name: test_all_entities[sensor.mock_title_temperature-entry]
@@ -276,6 +276,6 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unknown',
+    'state': '32',
   })
 # ---

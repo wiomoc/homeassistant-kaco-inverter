@@ -129,6 +129,7 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
             f"{coordinator.device_identifier}_{entity_description.key}"
         )
         self._attr_device_info = coordinator.device_info
+        self._attr_native_value = self.coordinator.data[self.entity_description.key]
 
     @callback
     def _handle_coordinator_update(self) -> None:
