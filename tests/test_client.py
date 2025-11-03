@@ -1,3 +1,5 @@
+"""Test the inverter client."""
+
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -10,8 +12,9 @@ from custom_components.kaco_inverter.client.fields import FIELDS_00_02, Annotate
 from custom_components.kaco_inverter.client.model_names import resolve_model_name
 
 
-@pytest.fixture
-def pyserial_serial_port() -> Generator[MagicMock]:
+@pytest.fixture(name="pyserial_serial_port")
+def pyserial_serial_port_fixture() -> Generator[MagicMock]:
+    """Provide a mock pyserial Serialport."""
     port_obj_mock = MagicMock()
 
     with patch(
@@ -23,7 +26,7 @@ def pyserial_serial_port() -> Generator[MagicMock]:
 
 
 @pytest.mark.parametrize(
-    "response,expected_result,annotate",
+    ("response", "expected_result", "annotate"),
     [
         (
             b"\n*030   4 486.8  1.29   627 236.0  2.43   558  24   3401 \x92 3600xi\r",
@@ -137,6 +140,7 @@ def pyserial_serial_port() -> Generator[MagicMock]:
 def test_query_readings(
     response: bytes, expected_result: dict[str, Any], annotate: bool
 ):
+    """Tests the parsing of the inverters query reading response."""
     port_mock = MagicMock()
     port_mock.is_open = True
     port_mock.read_until.return_value = response
@@ -153,6 +157,7 @@ def test_query_readings(
 def test_000xi_query_readings(
     has_cached_is_000xi: bool, pyserial_serial_port: MagicMock
 ):
+    """Tests the parsing of a 000xi inverters query reading responses."""
     responses = [
         b"\n*021   4 186.8 11.29 123621 136.1 13.45   1558 12  13401 \x23  8k1\r",
         b"\n*022   5 286.8 21.29 223621 236.1 23.45   2558 22  23401 \x2d  8k2\r",
@@ -201,16 +206,17 @@ def test_000xi_query_readings(
     pyserial_serial_port.read_until.side_effect = responses
 
     with KacoInverterClient("COM1", inverter_address) as client:
-        client._is_000xi = has_cached_is_000xi
+        client._is_000xi = has_cached_is_000xi  # noqa: SLF001
         result = client.query_readings(annotate=False)
         assert result == expected_result
-        assert client._is_000xi
+        assert client._is_000xi  # noqa: SLF001
         pyserial_serial_port.is_open = True
     pyserial_serial_port.open.assert_called()
     pyserial_serial_port.close.assert_called()
 
 
 def test_query_split_by_cr_checksum():
+    """Test if the response is correctly handled, if the checksum is the same character es the end-of-frame marker."""
     port_mock = MagicMock()
     port_mock.read_until.side_effect = [
         b"\n*420   4 699.9 999.99 999999 999.1 123.45   1558 42   13401 \r",
@@ -238,7 +244,7 @@ def test_query_split_by_cr_checksum():
 
 
 @pytest.mark.parametrize(
-    "response,expected_protocol_exception",
+    ("response", "expected_protocol_exception"),
     [
         (b"\n*030  ...\r", "Expected response from '1', got response from '3'"),
         (b"\n*016  ...\r", "Expected '0', '4' or 'n' command response, got '6'"),
@@ -286,13 +292,14 @@ def test_query_split_by_cr_checksum():
 def test_query_readings_exceptions(
     response: bytes, expected_protocol_exception: dict[str, Any]
 ):
+    """Test the error-handling of response parsing."""
     port_mock = MagicMock()
     port_mock.read_until.return_value = response
 
     inverter_address = 1
-    with pytest.raises(ProtocolException) as excinfo:
-        with KacoInverterClient(port_mock, inverter_address) as client:
-            client._infered_standard_fields = FIELDS_00_02
+    with KacoInverterClient(port_mock, inverter_address) as client:
+        client._infered_standard_fields = FIELDS_00_02  # noqa: SLF001
+        with pytest.raises(ProtocolException) as excinfo:
             client.query_readings(annotate=False)
     assert excinfo.value.args[0] == expected_protocol_exception
     port_mock.read_until.assert_called_with(b"\r")
@@ -300,7 +307,7 @@ def test_query_readings_exceptions(
 
 
 @pytest.mark.parametrize(
-    "inverter_type,model",
+    ("inverter_type", "model"),
     [
         ("3X24", "blueplanet 3.0NX3 M2"),
         ("03X24", "blueplanet 3.0NX3 M2"),
@@ -309,4 +316,5 @@ def test_query_readings_exceptions(
     ],
 )
 def test_resolve_model_name(inverter_type, model):
+    """Test if resolve_model_name."""
     assert resolve_model_name(inverter_type) == model

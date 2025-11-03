@@ -10,7 +10,6 @@ repos:
     hooks:
       # Run the linter.
       - id: ruff-check
-        exclude: ^tests/
       # Run the formatter.
       - id: ruff-format
   - repo: local

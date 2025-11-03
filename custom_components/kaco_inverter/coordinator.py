@@ -74,33 +74,41 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         config = self.config_entry.data
         port_name = config[CONF_PORT]
         inverter_address = config[CONF_INVERTER_ADDRESS]
-        self._client = KacoInverterClient(port=port_name, address=inverter_address)
-        with self._client as client:
-            try:
-                initial_reading = client.query_readings(annotate=True)
-            except Exception as err:  # pylint: disable=broad-except
-                self.last_exception = err
-                self.logger.exception("Unexpected error fetching %s data", self.name)
-                self.last_update_success = False
-                raise ConfigEntryNotReady from err
 
-            actual_serial_number = None
-            try:
-                actual_serial_number = client.query_serial_number()
-            except ProtocolException:
-                # Not all inverters support the query serial number command
-                pass
-            else:
-                expected_serial_number = config.get(CONF_SERIAL_NUMBER)
-                if (
-                    expected_serial_number
-                    and expected_serial_number != actual_serial_number
-                ):
-                    raise ConfigEntryError(
-                        "Serial number mismatch: "
-                        f"{actual_serial_number} != {expected_serial_number}"
+        def _query_reading_and_serial() -> tuple[dict[str, Any], str | None]:
+            self._client = KacoInverterClient(port=port_name, address=inverter_address)
+            with self._client as client:
+                try:
+                    initial_reading = client.query_readings(annotate=True)
+                except Exception as err:  # pylint: disable=broad-except
+                    self.last_exception = err
+                    self.logger.exception(
+                        "Unexpected error fetching %s data", self.name
                     )
+                    self.last_update_success = False
+                    raise ConfigEntryNotReady from err
 
+                actual_serial_number = None
+                try:
+                    actual_serial_number = client.query_serial_number()
+                except ProtocolException:
+                    # Not all inverters support the query serial number command
+                    pass
+                else:
+                    expected_serial_number = config.get(CONF_SERIAL_NUMBER)
+                    if (
+                        expected_serial_number
+                        and expected_serial_number != actual_serial_number
+                    ):
+                        raise ConfigEntryError(
+                            "Serial number mismatch: "
+                            f"{actual_serial_number} != {expected_serial_number}"
+                        )
+                return initial_reading, actual_serial_number
+
+        initial_reading, actual_serial_number = await self.hass.async_add_executor_job(
+            _query_reading_and_serial
+        )
         inverter_type = initial_reading["inverter_type"]
         if actual_serial_number:
             identifier = slugify(actual_serial_number)

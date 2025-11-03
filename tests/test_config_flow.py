@@ -1,17 +1,19 @@
+"""Tests the config flow."""
+
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-import pytest
 
 from custom_components.kaco_inverter.client import ProtocolException
 from custom_components.kaco_inverter.const import DOMAIN
-from homeassistant.config_entries import ConfigEntry
 
 
-@pytest.fixture
-def mock_setup_entry() -> Generator[AsyncMock]:
+@pytest.fixture(name="mock_setup_entry")
+def mock_setup_entry_fixture() -> Generator[AsyncMock]:
     """Mock setting up a config entry."""
     with patch(
         "custom_components.kaco_inverter.async_setup_entry",
@@ -20,8 +22,9 @@ def mock_setup_entry() -> Generator[AsyncMock]:
         yield mock_setup_entry
 
 
-@pytest.fixture
-def mock_kaco_client() -> Generator[MagicMock]:
+@pytest.fixture(name="mock_kaco_client")
+def mock_kaco_client_fixture() -> Generator[MagicMock]:
+    """Mock inverter client."""
     client_obj_mock = MagicMock()
     with patch(
         "custom_components.kaco_inverter.config_flow.KacoInverterClient",
@@ -52,6 +55,7 @@ async def test_user_flow_no_input(
 async def test_user_flow_cannot_connect(
     hass: HomeAssistant, mock_kaco_client: MagicMock, pyserial_comports: MagicMock
 ) -> None:
+    """Test the flow but connecting fails."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "user"}
     )
@@ -78,6 +82,7 @@ async def test_user_flow_success_without_serial(
     pyserial_comports: MagicMock,
     mock_setup_entry: AsyncMock,
 ) -> None:
+    """Test the flow succedding, but without the inverter providing a serialnumber."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "user"}
     )
@@ -112,6 +117,7 @@ async def test_user_flow_success_with_serial(
     pyserial_comports: MagicMock,
     mock_setup_entry: AsyncMock,
 ) -> None:
+    """Test the flow succedding, but with the inverter providing a serialnumber."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "user"}
     )
