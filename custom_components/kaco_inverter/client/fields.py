@@ -409,7 +409,8 @@ _COMMON_MISC_FIELDS = (
 # 3.3.1 Payload of Powador 16.0-18.0 TR3
 _GENERIC_SCHMEMA_331_TYPES = {"160TR", "180TR"}
 
-# 3.3.2 Payload of Powador 12.0-20.0 TL3/blueplanet 3.0-5.0 TL1/blueplanet 3.0-10.0 TL3/blueplanet 15.0 TL3 - 20.0 TL3
+# 3.3.2 Payload of Powador 12.0-20.0 TL3/blueplanet 3.0-5.0 TL1/blueplanet
+# 3.0-10.0 TL3/blueplanet 15.0 TL3 - 20.0 TL3
 _GENERIC_SCHMEMA_332_TYPES = {
     "30L11",
     "30L12",
@@ -437,7 +438,8 @@ _GENERIC_SCHMEMA_332_TYPES = {
     "20X24",
 }
 
-# 3.3.3 Payload of Powador 30.0-72.0 TL3/blueplanet 29.0 TL3 / blueplanet 50.0+60.0 TL3 and TL3 M3-Types
+# 3.3.3 Payload of Powador 30.0-72.0 TL3/blueplanet 29.0 TL3 / blueplanet 50.0+60.0 TL3
+# and TL3 M3-Types
 _GENERIC_SCHMEMA_333_TYPES = {
     "375TL",
     "390TL",

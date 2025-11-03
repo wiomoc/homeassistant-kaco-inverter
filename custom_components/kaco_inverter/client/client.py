@@ -8,10 +8,10 @@ from serial import Serial, SerialException
 
 from . import ProtocolException
 from .fields import (
-    FIELDS_SERIES_00_02,
-    FIELDS_SERIES_000XI,
     BASE_FIELDS_GENERIC,
     FIELDS_SERIAL,
+    FIELDS_SERIES_00_02,
+    FIELDS_SERIES_000XI,
     FIELDS_SERIES_XP,
     LegacyChecksumField,
     _Field,
