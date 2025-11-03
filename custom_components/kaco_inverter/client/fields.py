@@ -274,7 +274,8 @@ class _CrcAndStopField(_Field):
             raise ProtocolException("Expected end-of-frame")
 
 
-FIELDS_00_02 = (
+# 2 KACO Standard "legacy" protocol
+FIELDS_SERIES_00_02 = (
     _StartField(),
     _IntField("status", 3),
     _FloatField(
@@ -300,7 +301,7 @@ FIELDS_00_02 = (
     _LegacyStopField(),
 )
 
-FIELDS_000XI = (
+FIELDS_SERIES_000XI = (
     _StartField(),
     _IntField("status", 3),
     _FloatField(
@@ -326,7 +327,7 @@ FIELDS_000XI = (
     _LegacyStopField(),
 )
 
-FIELDS_XP = (
+FIELDS_SERIES_XP = (
     _StartField(),
     _IntField("status", 3),
     _FloatField(
@@ -353,6 +354,8 @@ FIELDS_XP = (
     _LegacyStopField(),
 )
 
+# 3 Generic Protocol
+
 FIELDS_SERIAL = (_StartField(), _StringField("serial_number"), _CrcAndStopField())
 
 
@@ -376,6 +379,11 @@ def _build_mpp_fields(index: int):
     )
 
 
+_DC_FIELDS = (
+    _FloatField("dc_voltage", quantity="V", description="DC Voltage"),
+    _FloatField("dc_current", quantity="A", description="DC Current"),
+)
+
 _AC_FIELDS = (
     _FloatField("ac_phase1_voltage", quantity="V", description="AC Voltage of Phase 1"),
     _FloatField("ac_phase1_current", quantity="A", description="AC Current of Phase 1"),
@@ -398,14 +406,131 @@ _COMMON_MISC_FIELDS = (
 )
 
 
-def _resolve_subfields(_inverter_type: str) -> list[_Field]:
-    return [
-        *_build_mpp_fields(1),
-        *_build_mpp_fields(2),
-        *_AC_FIELDS,
-        *_COMMON_POWER_FIELDS,
-        *_COMMON_MISC_FIELDS,
-    ]
+# 3.3.1 Payload of Powador 16.0-18.0 TR3
+_GENERIC_SCHMEMA_331_TYPES = {"160TR", "180TR"}
+
+# 3.3.2 Payload of Powador 12.0-20.0 TL3/blueplanet 3.0-5.0 TL1/blueplanet 3.0-10.0 TL3/blueplanet 15.0 TL3 - 20.0 TL3
+_GENERIC_SCHMEMA_332_TYPES = {
+    "30L11",
+    "30L12",
+    "35L12",
+    "37L12",
+    "40L12",
+    "46L12",
+    "50L12",
+    "30L32",
+    "40L32",
+    "50L32",
+    "65L32",
+    "75L32",
+    "86L32",
+    "90L32",
+    "100L32",
+    "150L32",
+    "200L32",
+    "3X24",
+    "5X24",
+    "8X24",
+    "10X24",
+    "12X24",
+    "15X24",
+    "20X24",
+}
+
+# 3.3.3 Payload of Powador 30.0-72.0 TL3/blueplanet 29.0 TL3 / blueplanet 50.0+60.0 TL3 and TL3 M3-Types
+_GENERIC_SCHMEMA_333_TYPES = {
+    "375TL",
+    "390TL",
+    "400TL",
+    "480TL",
+    "600TL",
+    "720TL",
+    "29kH3P",
+    "50KH3P",
+    "50kH4",
+    "50kRPO",
+    "60kH3P",
+    "BG0501",
+    "BG50TL",
+    "BQ50TL",
+    "92G14",
+    "110G15",
+    "137G16",
+}
+
+# 3.3.4 Payload of Powador XP100-350, TL3 M1 Types
+_GENERIC_SCHMEMA_334_TYPES = {
+    "360M1",
+    "390M150kH4P",
+    "100kTR",
+    "200kTR",
+    "200kTL",
+    "250kTR250kTL",
+    "350kTL",
+    "32kH4P",
+    "40kH4P",
+}
+
+
+# 3.3.5 Payload of blueplanet 87.0 – 165 TL3
+_GENERIC_SCHMEMA_335_TYPES = {
+    "87N13",
+    "92N14",
+    "100N13",
+    "105N14",
+    "110N15",
+    "125N15",
+    "125N16",
+    "137N16",
+    "150N17",
+    "155N16",
+    "165N17",
+}
+
+
+def _resolve_subfields(inverter_type: str) -> list[_Field]:
+    if (
+        inverter_type in _GENERIC_SCHMEMA_331_TYPES
+        or inverter_type in _GENERIC_SCHMEMA_333_TYPES
+    ):
+        return [
+            *_build_mpp_fields(1),
+            *_build_mpp_fields(2),
+            *_build_mpp_fields(3),
+            *_AC_FIELDS,
+            *_COMMON_POWER_FIELDS,
+            *_COMMON_MISC_FIELDS,
+        ]
+
+    if inverter_type in _GENERIC_SCHMEMA_332_TYPES:
+        return [
+            *_build_mpp_fields(1),
+            *_build_mpp_fields(2),
+            *_AC_FIELDS,
+            *_COMMON_POWER_FIELDS,
+            *_COMMON_MISC_FIELDS,
+        ]
+
+    if inverter_type in _GENERIC_SCHMEMA_334_TYPES:
+        return [
+            *_DC_FIELDS,
+            *_AC_FIELDS,
+            *_COMMON_POWER_FIELDS,
+            *_COMMON_MISC_FIELDS,
+        ]
+    if inverter_type in _GENERIC_SCHMEMA_335_TYPES:
+        return [
+            *_DC_FIELDS,
+            *_AC_FIELDS,
+            _IntField("dc_power", quantity="W", description="DC Power"),
+            _FloatField("ac_power", quantity="W", description="AC Power"),
+            _FloatField("ac_frequency", description="AC Frequency", quantity="Hz"),
+            *_COMMON_MISC_FIELDS,
+        ]
+
+    raise ProtocolException(
+        f"Can not resolve field schema for inverter type '{inverter_type}'"
+    )
 
 
 class _GenericPayloadField(_Field):
@@ -431,7 +556,7 @@ class _GenericPayloadField(_Field):
         return position
 
 
-FIELDS_GENERIC = (
+BASE_FIELDS_GENERIC = (
     _StartField(),
     _IntField("number_of_elements"),
     _StringField("inverter_type"),

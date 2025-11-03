@@ -8,11 +8,11 @@ from serial import Serial, SerialException
 
 from . import ProtocolException
 from .fields import (
-    FIELDS_00_02,
-    FIELDS_000XI,
-    FIELDS_GENERIC,
+    FIELDS_SERIES_00_02,
+    FIELDS_SERIES_000XI,
+    BASE_FIELDS_GENERIC,
     FIELDS_SERIAL,
-    FIELDS_XP,
+    FIELDS_SERIES_XP,
     LegacyChecksumField,
     _Field,
     expect_min_remaining_frame_length,
@@ -86,11 +86,13 @@ class KacoInverterClient:
                 self._infered_standard_fields, message, annotate=annotate
             )
         try:
-            data_dict = self._parse_fields(FIELDS_00_02, message, annotate=annotate)
-            self._infered_standard_fields = FIELDS_00_02
+            data_dict = self._parse_fields(
+                FIELDS_SERIES_00_02, message, annotate=annotate
+            )
+            self._infered_standard_fields = FIELDS_SERIES_00_02
         except ProtocolException:
-            data_dict = self._parse_fields(FIELDS_XP, message, annotate=annotate)
-            self._infered_standard_fields = FIELDS_XP
+            data_dict = self._parse_fields(FIELDS_SERIES_XP, message, annotate=annotate)
+            self._infered_standard_fields = FIELDS_SERIES_XP
 
         return data_dict
 
@@ -99,7 +101,9 @@ class KacoInverterClient:
         for index in ["1", "2", "3"]:
             reponse_command, message = self._send_command(index)
             assert reponse_command == index
-            sub_data_dict = self._parse_fields(FIELDS_000XI, message, annotate=annotate)
+            sub_data_dict = self._parse_fields(
+                FIELDS_SERIES_000XI, message, annotate=annotate
+            )
             for key, value in sub_data_dict.items():
                 data_dict[f"{index}_{key}"] = value
         # 8k1 -> 3x8k, 10k1 -> 3x10k, 11k1 -> 3x11k
@@ -110,7 +114,7 @@ class KacoInverterClient:
     def _handle_generic_readings(
         self, message: bytes, annotate: bool = False
     ) -> dict[str, Any]:
-        return self._parse_fields(FIELDS_GENERIC, message, annotate=annotate)
+        return self._parse_fields(BASE_FIELDS_GENERIC, message, annotate=annotate)
 
     def query_readings(self, annotate: bool = False) -> dict[str, Any]:
         """Query the current reading from the inverter.

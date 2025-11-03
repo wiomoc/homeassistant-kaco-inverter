@@ -8,7 +8,10 @@ import pytest
 
 from custom_components.kaco_inverter.client import ProtocolException
 from custom_components.kaco_inverter.client.client import KacoInverterClient
-from custom_components.kaco_inverter.client.fields import FIELDS_00_02, AnnotatedValue
+from custom_components.kaco_inverter.client.fields import (
+    FIELDS_SERIES_00_02,
+    AnnotatedValue,
+)
 from custom_components.kaco_inverter.client.model_names import resolve_model_name
 
 
@@ -132,6 +135,29 @@ def pyserial_serial_port_fixture() -> Generator[MagicMock]:
                 "daily_yield": 13401,
                 "inverter_type": "100kTR",
                 "total_yield": 123456789,
+            },
+            False,
+        ),
+        (
+            b"\n*03n 17 125N16 4 999.1 111.59 349.1 116.88 349.2 116.84 350.3 116.48 111489 111388.9 49.60 0.910o 41.6 525 451B\r",
+            {
+                "ac_frequency": 49.6,
+                "ac_phase1_current": 116.88,
+                "ac_phase1_voltage": 349.1,
+                "ac_phase2_current": 116.84,
+                "ac_phase2_voltage": 349.2,
+                "ac_phase3_current": 116.48,
+                "ac_phase3_voltage": 350.3,
+                "ac_power": 111388.9,
+                "cos_phi": 0.91,
+                "daily_yield": 525,
+                "dc_current": 111.59,
+                "dc_power": 111489,
+                "dc_voltage": 999.1,
+                "device_temperature": 41.6,
+                "inverter_type": "125N16",
+                "number_of_elements": 17,
+                "status": 4,
             },
             False,
         ),
@@ -287,6 +313,10 @@ def test_query_split_by_cr_checksum():
             b"\n*01n 20 3X24 4  214.7  1.97   421    0.0  0.04     0  231.1  0.80  234.1  0.79  234.4  0.81   421   413 0.735i  36.7   1640 7054\ra",
             "Expected end-of-frame",
         ),
+        (
+            b"\n*01n 20 XXXX 4  214.7  1.97",
+            "Can not resolve field schema for inverter type 'XXXX'",
+        ),
     ],
 )
 def test_query_readings_exceptions(
@@ -298,7 +328,7 @@ def test_query_readings_exceptions(
 
     inverter_address = 1
     with KacoInverterClient(port_mock, inverter_address) as client:
-        client._infered_standard_fields = FIELDS_00_02  # noqa: SLF001
+        client._infered_standard_fields = FIELDS_SERIES_00_02  # noqa: SLF001
         with pytest.raises(ProtocolException) as excinfo:
             client.query_readings(annotate=False)
     assert excinfo.value.args[0] == expected_protocol_exception
