@@ -8,7 +8,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -24,7 +23,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .client.fields import AnnotatedValue
-from .coordinator import KacoInverterCoordinator
+from .coordinator import KacoConfigEntry, KacoInverterCoordinator
 
 PARALLEL_UPDATES = 1
 
@@ -93,22 +92,18 @@ def _build_sensor_entity_descriptions(
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    _hass: HomeAssistant,
+    entry: KacoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Setup the inverter entities."""
+    coordinator = entry.runtime_data
 
-    coordinator = KacoInverterCoordinator(hass, entry)
-
-    annotated_initial_reading = (
-        await coordinator.async_config_entry_first_refresh_annotated()
-    )
-
+    assert coordinator.annotated_initial_reading
     async_add_entities(
         KacoSensor(coordinator, sensor_entity_type)
         for sensor_entity_type in _build_sensor_entity_descriptions(
-            annotated_initial_reading
+            coordinator.annotated_initial_reading
         )
     )
 

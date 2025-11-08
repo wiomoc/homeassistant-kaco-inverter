@@ -26,6 +26,8 @@ from .client.fields import AnnotatedValue
 from .client.model_names import resolve_model_name
 from .const import CONF_INVERTER_ADDRESS, CONF_SERIAL_NUMBER, DOMAIN
 
+type KacoConfigEntry = ConfigEntry[KacoInverterCoordinator]
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -34,6 +36,7 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     device_info: DeviceInfo | None
     device_identifier: str | None
+    annotated_initial_reading: dict[str, Any] | None
     _client: KacoInverterClient | None
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry):
@@ -49,9 +52,7 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_identifier = None
         self._client = None
 
-    async def async_config_entry_first_refresh_annotated(
-        self,
-    ) -> dict[str, AnnotatedValue]:
+    async def async_config_entry_first_refresh(self) -> None:
         """Perform the initial, annotated refresh of inverter data and configure device metadata.
 
         This coroutine performs the first successful data fetch from a KACO inverter when
@@ -60,9 +61,6 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         retrieve the inverter serial number. The method also validates an expected
         serial from the config entry (if present) and raises ConfigEntryError on a
         mismatch.
-
-        Returns:
-            The annotated initial readings retrieved from the inverter.
 
         Raises:
             ConfigEntryError: If an expected serial number (provided in the config entry)
@@ -109,6 +107,7 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         initial_reading, actual_serial_number = await self.hass.async_add_executor_job(
             _query_reading_and_serial
         )
+        self.annotated_initial_reading = initial_reading
         inverter_type = initial_reading["inverter_type"]
         if actual_serial_number:
             identifier = slugify(actual_serial_number)
@@ -122,13 +121,12 @@ class KacoInverterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             serial_number=actual_serial_number,
             identifiers={(DOMAIN, identifier)},
         )
+        # Store the raw values as current data
         self.data = {
             key: value.value if isinstance(value, AnnotatedValue) else value
             for key, value in initial_reading.items()
         }
         self.last_update_success = True
-
-        return initial_reading
 
     async def _async_update_data(self) -> dict[str, Any]:
         def _update_data():
