@@ -45,6 +45,8 @@ class KacoInverterClient:
             response = self._port.read_until(b"\r")
         except SerialException as e:
             raise ProtocolException("Serial port error") from e
+        if not response:
+            raise ProtocolException("Inverter did not respond")
         expect_min_remaining_frame_length(response, 0, 5)
         field_value_bytes = response[:5]
         try:

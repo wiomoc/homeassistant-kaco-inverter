@@ -272,6 +272,7 @@ def test_query_split_by_cr_checksum():
 @pytest.mark.parametrize(
     ("response", "expected_protocol_exception"),
     [
+        (b"", "Inverter did not respond"),
         (b"\n*030  ...\r", "Expected response from '1', got response from '3'"),
         (b"\n*016  ...\r", "Expected '0', '4' or 'n' command response, got '6'"),
         (b"\n*\xff10  ...\r", "Expected ASCII characters, got b'\\n*\\xff10'"),
