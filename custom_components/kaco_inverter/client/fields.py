@@ -3,6 +3,7 @@
 import abc
 import typing
 from dataclasses import dataclass
+from enum import IntEnum
 
 import crc
 
@@ -198,6 +199,33 @@ class _DurationField(_ValueField[int]):
             ) from e
 
 
+class Status(IntEnum):
+    """Enum of potential inverter status."""
+
+    STARTING_UP = 1
+    SYNCING_TO_GRID = 2
+    TEARING_DOWN_VOLTAGE_TO_LOW = 3
+    NORMAL_MPP_SEARCHING = 4
+    NORMAL_MPP_NOT_SEARCHING = 5
+    ERROR = 9
+    TURNED_OFF_OVERHEAD = 10
+    THROTTLING_OVERPOWER = 11
+    TURNED_OFF_OVERPOWER = 12
+    GRID_OUTAGE = 14
+    TURNING_OFF = 15
+
+
+class _StatusField(_ValueField[Status]):
+    def parse(self, field_value_bytes: bytes) -> Status:
+        try:
+            field_value_string = field_value_bytes.decode("ASCII").lstrip()
+            return Status(int(field_value_string))
+        except (UnicodeDecodeError, ValueError) as e:
+            raise ProtocolException(
+                f"Expected status, got {field_value_bytes!r}"
+            ) from e
+
+
 class LegacyChecksumField(_Field):
     """Represents a one-byte checksum used in the legacy protocol."""
 
@@ -277,7 +305,7 @@ class _CrcAndStopField(_Field):
 # 2 KACO Standard "legacy" protocol
 FIELDS_SERIES_00_02 = (
     _StartField(),
-    _IntField("status", 3),
+    _StatusField("status", 3),
     _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
@@ -303,7 +331,7 @@ FIELDS_SERIES_00_02 = (
 
 FIELDS_SERIES_000XI = (
     _StartField(),
-    _IntField("status", 3),
+    _StatusField("status", 3),
     _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
@@ -329,7 +357,7 @@ FIELDS_SERIES_000XI = (
 
 FIELDS_SERIES_XP = (
     _StartField(),
-    _IntField("status", 3),
+    _StatusField("status", 3),
     _FloatField(
         "dc_voltage", 5, precision=1, quantity="V", description="Generator Voltage"
     ),
@@ -562,7 +590,7 @@ BASE_FIELDS_GENERIC = (
     _StartField(),
     _IntField("number_of_elements"),
     _StringField("inverter_type"),
-    _IntField("status"),
+    _StatusField("status"),
     _GenericPayloadField(),
     _CrcAndStopField(),
 )

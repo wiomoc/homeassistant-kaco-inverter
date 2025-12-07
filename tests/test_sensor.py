@@ -12,7 +12,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.kaco_inverter.client.fields import AnnotatedValue
+from custom_components.kaco_inverter.client.fields import AnnotatedValue, Status
 
 
 @pytest.fixture(name="mock_kaco_client")
@@ -52,6 +52,7 @@ async def test_all_entities(
         "device_temperature": AnnotatedValue(
             value=32, description="Temperature", quantity="°C"
         ),
+        "status": Status.NORMAL_MPP_SEARCHING,
         "ignored": 42,
     }
 

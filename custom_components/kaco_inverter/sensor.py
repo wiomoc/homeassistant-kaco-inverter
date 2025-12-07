@@ -1,5 +1,6 @@
 """Platform for integration of KACO inverters via RS485."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -22,7 +23,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from .client.fields import AnnotatedValue
+from .client.fields import AnnotatedValue, Status
 from .coordinator import KacoConfigEntry, KacoInverterCoordinator
 
 PARALLEL_UPDATES = 1
@@ -70,25 +71,26 @@ _QUANTITY_MAPPING = {
 
 def _build_sensor_entity_descriptions(
     data_dict: dict[str, Any],
-) -> list[SensorEntityDescription]:
-    descriptions = []
+) -> Iterable[SensorEntityDescription]:
+    yield SensorEntityDescription(
+        key="status",
+        name="Status",
+        device_class=SensorDeviceClass.ENUM,
+        state_class=SensorStateClass.MEASUREMENT,
+    )
     for key, value in data_dict.items():
         if not isinstance(value, AnnotatedValue):
             continue
         quantity_info = _QUANTITY_MAPPING.get(value.quantity)
         if not quantity_info:
             continue
-        descriptions.append(
-            SensorEntityDescription(
-                key=key,
-                name=value.description,
-                device_class=quantity_info[0],
-                native_unit_of_measurement=quantity_info[1],
-                state_class=quantity_info[2],
-            )
+        yield SensorEntityDescription(
+            key=key,
+            name=value.description,
+            device_class=quantity_info[0],
+            native_unit_of_measurement=quantity_info[1],
+            state_class=quantity_info[2],
         )
-
-    return descriptions
 
 
 async def async_setup_entry(
@@ -129,5 +131,9 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.entity_description.key == "daily_yield" and self.coordinator.data.get(
+            "status"
+        ) in (Status.STARTING_UP, Status.SYNCING_TO_GRID):
+            return
         self._attr_native_value = self.coordinator.data[self.entity_description.key]
         self.async_write_ha_state()

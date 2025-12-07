@@ -11,6 +11,7 @@ from custom_components.kaco_inverter.client.client import KacoInverterClient
 from custom_components.kaco_inverter.client.fields import (
     FIELDS_SERIES_00_02,
     AnnotatedValue,
+    Status,
 )
 from custom_components.kaco_inverter.client.model_names import resolve_model_name
 
@@ -34,7 +35,7 @@ def pyserial_serial_port_fixture() -> Generator[MagicMock]:
         (
             b"\n*030   4 486.8  1.29   627 236.0  2.43   558  24   3401 \x92 3600xi\r",
             {
-                "status": 4,
+                "status": Status.NORMAL_MPP_SEARCHING,
                 "dc_voltage": AnnotatedValue(
                     value=486.8, quantity="V", description="Generator Voltage"
                 ),
@@ -68,7 +69,7 @@ def pyserial_serial_port_fixture() -> Generator[MagicMock]:
             {
                 "number_of_elements": 20,
                 "inverter_type": "3X24",
-                "status": 4,
+                "status": Status.NORMAL_MPP_SEARCHING,
                 "dc_mppt1_voltage": AnnotatedValue(
                     value=214.7, quantity="V", description="DC Voltage of MPPT1"
                 ),
@@ -124,7 +125,7 @@ def pyserial_serial_port_fixture() -> Generator[MagicMock]:
         (
             b"\n*030   4 486.8 111.29 123627 236.1 123.45   1558 42   13401 \xb3 100kTR 123456789\r",
             {
-                "status": 4,
+                "status": Status.NORMAL_MPP_SEARCHING,
                 "dc_voltage": 486.8,
                 "dc_current": 111.29,
                 "dc_power": 123627,
@@ -157,7 +158,7 @@ def pyserial_serial_port_fixture() -> Generator[MagicMock]:
                 "device_temperature": 41.6,
                 "inverter_type": "125N16",
                 "number_of_elements": 17,
-                "status": 4,
+                "status": Status.NORMAL_MPP_SEARCHING,
             },
             False,
         ),
@@ -187,13 +188,13 @@ def test_000xi_query_readings(
     responses = [
         b"\n*021   4 186.8 11.29 123621 136.1 13.45   1558 12  13401 \x23  8k1\r",
         b"\n*022   5 286.8 21.29 223621 236.1 23.45   2558 22  23401 \x2d  8k2\r",
-        b"\n*023   6 386.8 31.29 323621 336.1 33.45   3558 32  33401 \x37  8k3\r",
+        b"\n*023   4 386.8 31.29 323621 336.1 33.45   3558 32  33401 \x35  8k3\r",
     ]
     if not has_cached_is_000xi:
         responses.insert(0, b"\n*024\r")
 
     expected_result = {
-        "1_status": 4,
+        "1_status": Status.NORMAL_MPP_SEARCHING,
         "1_dc_voltage": 186.8,
         "1_dc_current": 11.29,
         "1_dc_power": 123621,
@@ -203,7 +204,7 @@ def test_000xi_query_readings(
         "1_device_temperature": 12,
         "1_daily_yield": 13401,
         "1_inverter_type": "8k1",
-        "2_status": 5,
+        "2_status": Status.NORMAL_MPP_NOT_SEARCHING,
         "2_dc_voltage": 286.8,
         "2_dc_current": 21.29,
         "2_dc_power": 223621,
@@ -213,7 +214,7 @@ def test_000xi_query_readings(
         "2_device_temperature": 22,
         "2_daily_yield": 23401,
         "2_inverter_type": "8k2",
-        "3_status": 6,
+        "3_status": Status.NORMAL_MPP_SEARCHING,
         "3_dc_voltage": 386.8,
         "3_dc_current": 31.29,
         "3_dc_power": 323621,
@@ -249,7 +250,7 @@ def test_query_split_by_cr_checksum():
         b" 100kTR 123456789\r",
     ]
     expected_result = {
-        "status": 4,
+        "status": Status.NORMAL_MPP_SEARCHING,
         "dc_voltage": 699.9,
         "dc_current": 999.99,
         "dc_power": 999999,
@@ -278,9 +279,10 @@ def test_query_split_by_cr_checksum():
         (b"\n*\xff10  ...\r", "Expected ASCII characters, got b'\\n*\\xff10'"),
         (b"\n*010  ", "Unexpected end-of-frame"),
         (b"\n*010abcdef", "Expected ' ', got b'a'"),
-        (b"\n*010  xx", "Expected integer, got b' xx'"),
+        (b"\n*010  xx 1.29", "Expected status, got b' xx'"),
         (b"\n*010   4  xx.x", "Expected float, got b' xx.x'"),
         (b"\n*010   4  1.23", "Expected 1 decimal places in field dc_voltage"),
+        (b"\n*010   4 486.8  1.29  xxx ", "Expected integer, got b' xxx '"),
         (
             b"\n*010   4 486.8  1.29   627 236.0  2.43   558  24   3401 \x90 3\xff00xi\r",
             "Expected ASCII characters, got b'3\\xff00xi'",
