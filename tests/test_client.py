@@ -188,7 +188,7 @@ def test_000xi_query_readings(
     responses = [
         b"\n*021   4 186.8 11.29 123621 136.1 13.45   1558 12  13401 \x23  8k1\r",
         b"\n*022   5 286.8 21.29 223621 236.1 23.45   2558 22  23401 \x2d  8k2\r",
-        b"\n*023   4 386.8 31.29 323621 336.1 33.45   3558 32  33401 \x35  8k3\r",
+        b"\n*023   7 386.8 31.29 323621 336.1 33.45   3558 32  33401 \x38  8k3\r",
     ]
     if not has_cached_is_000xi:
         responses.insert(0, b"\n*024\r")
@@ -214,7 +214,7 @@ def test_000xi_query_readings(
         "2_device_temperature": 22,
         "2_daily_yield": 23401,
         "2_inverter_type": "8k2",
-        "3_status": Status.NORMAL_MPP_SEARCHING,
+        "3_status": Status.UNKNOWN,
         "3_dc_voltage": 386.8,
         "3_dc_current": 31.29,
         "3_dc_power": 323621,

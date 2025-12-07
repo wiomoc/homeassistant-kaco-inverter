@@ -133,7 +133,7 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
         """Handle updated data from the coordinator."""
         if self.entity_description.key == "daily_yield" and self.coordinator.data.get(
             "status"
-        ) in (Status.STARTING_UP, Status.SYNCING_TO_GRID):
+        ) in (Status.STARTING_UP, Status.SYNCING_TO_GRID, Status.TURNING_OFF):
             # Ignore daily yield from past day
             return
         self._update_value()

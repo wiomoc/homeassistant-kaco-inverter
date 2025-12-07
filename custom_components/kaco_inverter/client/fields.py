@@ -202,11 +202,13 @@ class _DurationField(_ValueField[int]):
 class Status(IntEnum):
     """Enum of potential inverter status."""
 
+    UNKNOWN = 0
     STARTING_UP = 1
     SYNCING_TO_GRID = 2
     TEARING_DOWN_VOLTAGE_TO_LOW = 3
     NORMAL_MPP_SEARCHING = 4
     NORMAL_MPP_NOT_SEARCHING = 5
+    TURNED_OFF_VOLTAGE_TO_LOW = 6
     ERROR = 9
     TURNED_OFF_OVERHEAD = 10
     THROTTLING_OVERPOWER = 11
@@ -218,12 +220,15 @@ class Status(IntEnum):
 class _StatusField(_ValueField[Status]):
     def parse(self, field_value_bytes: bytes) -> Status:
         try:
-            field_value_string = field_value_bytes.decode("ASCII").lstrip()
-            return Status(int(field_value_string))
+            field_value_int = int(field_value_bytes.decode("ASCII").lstrip())
         except (UnicodeDecodeError, ValueError) as e:
             raise ProtocolException(
                 f"Expected status, got {field_value_bytes!r}"
             ) from e
+        try:
+            return Status(field_value_int)
+        except ValueError:
+            return Status.UNKNOWN
 
 
 class LegacyChecksumField(_Field):
