@@ -272,7 +272,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': '4',
+    'state': 'NORMAL_MPP_SEARCHING',
   })
 # ---
 # name: test_all_entities[sensor.mock_title_temperature-entry]

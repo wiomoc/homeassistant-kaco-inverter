@@ -126,7 +126,7 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
             f"{coordinator.device_identifier}_{entity_description.key}"
         )
         self._attr_device_info = coordinator.device_info
-        self._attr_native_value = self.coordinator.data[self.entity_description.key]
+        self._update_value()
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -134,6 +134,13 @@ class KacoSensor(CoordinatorEntity[KacoInverterCoordinator], SensorEntity):
         if self.entity_description.key == "daily_yield" and self.coordinator.data.get(
             "status"
         ) in (Status.STARTING_UP, Status.SYNCING_TO_GRID):
+            # Ignore daily yield from past day
             return
-        self._attr_native_value = self.coordinator.data[self.entity_description.key]
+        self._update_value()
         self.async_write_ha_state()
+
+    def _update_value(self) -> None:
+        value = self.coordinator.data[self.entity_description.key]
+        if self.entity_description.key == "status":
+            value = value.name
+        self._attr_native_value = value
