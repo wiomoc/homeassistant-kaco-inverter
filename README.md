@@ -6,11 +6,11 @@ This Home Assistant custom component allows you to integrate PV inverters from K
 
 ## HACS
 
-The recommend way to install `dht` is through [HACS](https://hacs.xyz/).
+The recommend way to install `kaco_inverter` is through [HACS](https://hacs.xyz/).
 
 ## Manual installation
 
-Copy the `dht` folder and all of its contents into your Home Assistant's `custom_components` folder. This folder is usually inside your `/config` folder. If you are running Hass.io, use SAMBA to copy the folder over. You may need to create the `custom_components` folder and then copy the `dht` folder and all of its contents into it.
+Copy the `kaco_inverter` folder and all of its contents into your Home Assistant's `custom_components` folder. This folder is usually inside your `/config` folder. If you are running Hass.io, use SAMBA to copy the folder over. You may need to create the `custom_components` folder and then copy the `kaco_inverter` folder and all of its contents into it.
 
 # Setup
 
